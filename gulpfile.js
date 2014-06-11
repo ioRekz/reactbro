@@ -1,7 +1,6 @@
 var gulp = require('gulp'),
     react = require('gulp-react'),
     browserify = require('gulp-browserify'),
-    livereload = require('gulp-livereload'),
     uglify = require('gulp-uglify'),
     connect = require('gulp-connect'),
     replace = require('gulp-replace'),

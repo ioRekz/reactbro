@@ -18,7 +18,9 @@
     "gulp-replace": "~0.3.0",
     "psi": "0.0.2",
     "superagent": "~0.18.0",
-    "gulp-plumber": "~0.6.2"
+    "gulp-plumber": "~0.6.2",
+    "gulp": "~3.8.0",
+    "gulp-connect": "~2.0.5"
   },
   "dependencies": {
     "gulp-open": "~0.2.8"
