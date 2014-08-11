@@ -1,83 +1,85 @@
 var gulp = require('gulp'),
     react = require('gulp-react'),
-    browserify = require('gulp-browserify'),
+    browserify = require('browserify'),
     uglify = require('gulp-uglify'),
-    connect = require('gulp-connect'),
-    replace = require('gulp-replace'),
-    open = require('gulp-open'),
+    webserver = require('gulp-webserver')
     plumber = require('gulp-plumber'),
+    gutil = require("gulp-util"),
+    source = require('vinyl-source-stream'),
+    watchify = require('watchify'),
+    notify = require('gulp-notify'),
+    reactify = require('reactify'),
+    streamify = require('gulp-streamify')
     gulpif = require('gulp-if');
-
-var flo = require('fb-flo'),
-    fs = require('fs'),
-    path = require('path'),
-    exec = require('child_process').exec,
-    psi = require('psi'),
-    preprocess = require('gulp-preprocess')
-    ;
 
 var env = process.env.NODE_ENV || "dev";
 var isProd = function() { return env === 'prod' };
 var whenProd = function(act) { return gulpif(isProd(), act) };
 
 
-/********************* MISC TASKS **********************/
-gulp.task('psi', function (cb) {
-   psi({
-       nokey: 'true', // or use key: ‘YOUR_API_KEY’
-       url: "http://localhost:8080",
-       strategy: 'mobile',
-   }, cb);
-});
-/*******************************************************/
-
 function onError (error) {
   console.log(error);
 }
 
-gulp.task('scripts', function() {
-    // Single entry point to browserify
-    console.log("scripts with "+env)
-    gulp.src('js/app.jsx')
-        .pipe(plumber())
-        .pipe(browserify({
-          insertGlobals : true
-        }))
-        .pipe(react())
-        .pipe(whenProd(uglify()))
+function handleError(task) {
+  return function(err) {
+    gutil.log(gutil.colors.red(err));
+    notify.onError(task + ' failed, check the logs..')(err);
+  };
+}
+
+function scripts(watch) {
+  var bundler, rebundle;
+  console.log(__dirname)
+  bundler = browserify({
+    basedir: __dirname,
+    entries: './js/app.jsx',
+    debug: !isProd(),
+    cache: {}, // required for watchify
+    packageCache: {}, // required for watchify
+    fullPaths: watch // required to be true only for watchify
+  });
+  if(watch) {
+    bundler = watchify(bundler)
+  }
+
+  bundler.transform(reactify);
+
+  rebundle = function() {
+    var stream = bundler.bundle();
+    stream.on('error', handleError('Browserify'));
+    stream = stream.pipe(source('app.js'));
+    console.log("rebundle")
+    return stream
+        .pipe(whenProd(streamify(uglify())))
         .pipe(gulpif(isProd(), gulp.dest('./dist/build/js'), gulp.dest('./build/js')))
-        .pipe(connect.reload());
+  };
+
+  bundler.on('update', rebundle);
+  return rebundle();
+}
+
+gulp.task('scripts', function() {
+    scripts(false)
 });
-
-gulp.task('open', function() {
-  var options = {
-     url: "http://localhost:8080"
-   };
-   gulp.src("./index.html")
-   .pipe(open("", options));
-})
-
-gulp.task('html', function() {
-  gulp.src('./index.html')
-    .pipe(replace('libs/react.js', '//cdnjs.cloudflare.com/ajax/libs/react/0.10.0/react.min.js'))
-    .pipe(gulp.dest('./dist/'))
-});
-
 
 gulp.task('webserver', function() {
-  connect.server({
-    livereload: true
-  });
+  gulp.src('.')
+    .pipe(webserver({
+          livereload: true,
+          directoryListing: false,
+          open: true
+        }));
 });
 
-gulp.task('watch', function() {
-  gulp.watch(['./js/**/*.jsx', './css/**/*.css'], ['scripts'])
-})
+gulp.task('watchScripts', function() {
+  return scripts(true);
+});
 
 gulp.task('prodenv', function() {
   env = 'prod'
 })
 
-gulp.task('prod', ['prodenv','scripts', 'html'])
+gulp.task('prod', ['prodenv','scripts'])
 
-gulp.task('default', ['scripts', 'webserver', 'watch', 'open']);
+gulp.task('default', ['watchScripts', 'webserver']);
